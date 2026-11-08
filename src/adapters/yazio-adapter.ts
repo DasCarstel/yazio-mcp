@@ -15,6 +15,7 @@ import type {
   Product,
   ProductDetails,
   UserRecipeDetails,
+  UserMeal,
   UserProfile,
   WaterIntake,
   WaterWriteInput,
@@ -101,6 +102,26 @@ const rawRecipeSchema = z
     available_since: z.string().nullable(),
     is_pro_recipe: z.boolean(),
     servings: z.array(rawRecipeServingSchema),
+  })
+  .passthrough();
+
+const rawUserMealSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string().min(1),
+    products: z
+      .array(
+        z
+          .object({
+            product_id: z.string().min(1),
+            amount: z.number().finite().nonnegative(),
+            serving: z.string().nullable().optional(),
+            serving_quantity: z.number().finite().nullable().optional(),
+          })
+          .passthrough(),
+      )
+      .default([]),
+    recipe_portions: z.array(z.unknown()).default([]),
   })
   .passthrough();
 
@@ -362,6 +383,26 @@ export class YazioAdapter implements NutritionBackend {
       is_pro_recipe: recipe.is_pro_recipe,
       servings: recipe.servings,
     };
+  }
+
+  async listUserMeals(): Promise<UserMeal[]> {
+    const endpoint = '/user/meals';
+    const meals = this.parseUpstream(
+      z.array(rawUserMealSchema),
+      await this.request(endpoint),
+      endpoint,
+    );
+    return meals.map((meal) => ({
+      id: meal.id,
+      name: meal.name,
+      items: meal.products.map((item) => ({
+        product_id: item.product_id,
+        amount: item.amount,
+        serving: item.serving ?? null,
+        serving_quantity: item.serving_quantity ?? null,
+      })),
+      recipe_portion_count: meal.recipe_portions.length,
+    }));
   }
 
   async getDiary(date: string): Promise<DiaryDay> {

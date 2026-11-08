@@ -25,15 +25,20 @@ import {
   batchOutputSchema,
   comparePeriodsOutputSchema,
   comparePeriodsInputSchema,
+  compactProductOutputSchema,
   dailySummaryOutputSchema,
-  dateOrRangeInputSchema,
   diaryDayOutputSchema,
+  diaryInputSchema,
   exerciseOutputSchema,
   getDateInputSchema,
   getGoalsInputSchema,
   getProductInputSchema,
   goalsOutputSchema,
   listSavedMealsInputSchema,
+  listUserMealsInputSchema,
+  listUserMealsOutputSchema,
+  logUserMealInputSchema,
+  logUserMealOutputSchema,
   listSavedMealsOutputSchema,
   logSavedMealInputSchema,
   logSavedMealOutputSchema,
@@ -56,6 +61,7 @@ import {
   weightOutputSchema,
 } from './schemas.js';
 import { SavedMealService, SavedMealStore } from './services/saved-meals.js';
+import { UserMealService } from './services/user-meals.js';
 import { WriteService } from './services/write-service.js';
 import type { NutritionBackend } from './types.js';
 import { mapSettledWithConcurrency, mapWithConcurrency } from './utils/concurrency.js';
@@ -184,6 +190,7 @@ export const createYazioServer = async (
     new WriteService(backend, idempotency, config.timezone);
   const savedMealStore = new SavedMealStore(config.savedMealsPath);
   const savedMealService = new SavedMealService(savedMealStore, backend, writeService);
+  const userMealService = new UserMealService(backend, writeService);
   const requestStateCodec = createRequestStateCodec<DestructiveRequestState>({
     key: await idempotency.requestStateKey(),
     ttlSeconds: 10 * 60,
@@ -260,13 +267,30 @@ export const createYazioServer = async (
       description:
         'Searches YAZIO products. Defaults to US and en_US and accepts country/locale overrides; nutrition is normalized per 100 g/ml.',
       inputSchema: searchProductsInputSchema,
-      outputSchema: toolOutputSchema(z.array(productOutputSchema)),
+      outputSchema: toolOutputSchema(
+        z.array(z.union([productOutputSchema, compactProductOutputSchema])),
+      ),
       annotations: readAnnotations,
     },
-    async (input) =>
+    async ({ compact, ...input }) =>
       safeResult(
         config,
-        () => backend.searchProducts(input),
+        async () => {
+          const products = await backend.searchProducts(input);
+          if (!compact) return products;
+          return products.map((product) => ({
+            product_id: product.id,
+            name: product.name,
+            brand: product.producer,
+            serving: product.serving,
+            per_100g: {
+              calories: product.nutrition.calories,
+              protein: product.nutrition.protein,
+              carbs: product.nutrition.carbs,
+              fat: product.nutrition.fat,
+            },
+          }));
+        },
         (data) => `Found ${Array.isArray(data) ? data.length : 0} products.`,
       ),
   );
@@ -294,21 +318,36 @@ export const createYazioServer = async (
       title: 'Nutrition diary',
       description:
         'Returns the diary for one date or a locally aggregated range of up to 31 days; YAZIO has no confirmed range endpoint.',
-      inputSchema: dateOrRangeInputSchema,
+      inputSchema: diaryInputSchema,
       outputSchema: toolOutputSchema(z.object({ days: z.array(diaryDayOutputSchema) })),
       annotations: readAnnotations,
     },
-    async (input) =>
+    async ({ compact, ...input }) =>
       safeResult(
         config,
         async () => {
           const dates = resolveDateOrRange(input, config.timezone, 31);
+          const days = await mapWithConcurrency(
+            dates,
+            rangeReadConcurrency,
+            (date) => backend.getDiary(date),
+          );
+          if (!compact) return { days };
           return {
-            days: await mapWithConcurrency(
-              dates,
-              rangeReadConcurrency,
-              (date) => backend.getDiary(date),
-            ),
+            days: days.map((day) => ({
+              ...day,
+              items: day.items.map((item) => ({
+                id: item.id,
+                daytime: item.daytime,
+                kind: item.kind,
+                product_id: item.product_id,
+                recipe_id: item.recipe_id,
+                name: item.name,
+                amount: item.amount,
+                serving: item.serving,
+                serving_quantity: item.serving_quantity,
+              })),
+            })),
           };
         },
         (data) => {
@@ -489,6 +528,45 @@ export const createYazioServer = async (
         config,
         () => savedMealService.saveMeal(input),
         (data) => `Saved meal "${(data as { meal: { name: string } }).meal.name}" locally.`,
+      ),
+  );
+
+  server.registerTool(
+    'list_user_meals',
+    {
+      title: 'YAZIO meals',
+      description:
+        'Lists the meal templates saved in the YAZIO app (GET /user/meals) as meal_id, name and item_count; optional case-insensitive query filter.',
+      inputSchema: listUserMealsInputSchema,
+      outputSchema: toolOutputSchema(listUserMealsOutputSchema),
+      annotations: readAnnotations,
+    },
+    async ({ query }) =>
+      safeResult(
+        config,
+        () => userMealService.listMeals(query),
+        (data) => `Retrieved ${(data as { meals: unknown[] }).meals.length} YAZIO meals.`,
+      ),
+  );
+
+  server.registerTool(
+    'log_user_meal',
+    {
+      title: 'Log YAZIO meal',
+      description:
+        'Books a meal template from the YAZIO app by name (case-insensitive) through the same code path as add_meal_batch; daytime is required, dry_run defaults to true.',
+      inputSchema: logUserMealInputSchema,
+      outputSchema: toolOutputSchema(logUserMealOutputSchema),
+      annotations: writeAnnotations,
+    },
+    async (input) =>
+      safeResult(
+        config,
+        () => userMealService.logUserMeal(input),
+        (data) =>
+          `Batch result for "${(data as { meal_name: string }).meal_name}": ${statusText(
+            (data as { batch: unknown }).batch,
+          )}.`,
       ),
   );
 

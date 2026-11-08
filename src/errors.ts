@@ -19,6 +19,7 @@ export const errorCodeSchema = z.enum([
   'WRITE_NOT_VERIFIED',
   'UNSUPPORTED_OPERATION',
   'SAVED_MEAL_NOT_FOUND',
+  'MEAL_NOT_FOUND',
   'INTERNAL_ERROR',
 ]);
 

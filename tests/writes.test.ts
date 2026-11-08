@@ -27,6 +27,7 @@ const backend = (): NutritionBackend => ({
   getUserProfile: vi.fn(),
   getGoals: vi.fn(),
   searchProducts: vi.fn(),
+  listUserMeals: vi.fn(),
   getProduct: vi.fn().mockResolvedValue({
     id: PRODUCT_ID,
     name: 'Fixture product',

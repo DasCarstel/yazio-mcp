@@ -60,6 +60,7 @@ const createBackend = (): NutritionBackend => ({
   getUserProfile: vi.fn(),
   getGoals: vi.fn(),
   searchProducts: vi.fn(),
+  listUserMeals: vi.fn(),
   getProduct: vi.fn((id: string) => Promise.resolve(productDetails(id))),
   listUserRecipeIds: vi.fn(),
   getRecipe: vi.fn(),

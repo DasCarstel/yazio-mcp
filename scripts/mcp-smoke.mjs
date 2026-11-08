@@ -180,6 +180,8 @@ const runClient = async (mode, expectedEra) => {
       'list_saved_meals',
       'log_saved_meal',
       'save_meal',
+      'list_user_meals',
+      'log_user_meal',
       'get_nutrition_trends',
       'compare_periods',
       'detect_probable_missing_meals',

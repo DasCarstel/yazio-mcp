@@ -31,34 +31,53 @@ export const dateRangeSchema = z
     path: ['end_date'],
   });
 
+const dateOrRangeShape = {
+  date: isoDateSchema.optional(),
+  start_date: isoDateSchema.optional(),
+  end_date: isoDateSchema.optional(),
+};
+
+const refineDateOrRange = (
+  { date, start_date, end_date }: {
+    date?: string | undefined;
+    start_date?: string | undefined;
+    end_date?: string | undefined;
+  },
+  context: z.RefinementCtx,
+) => {
+  if (date !== undefined && (start_date !== undefined || end_date !== undefined)) {
+    context.addIssue({
+      code: 'custom',
+      message: 'Provide either date or start_date/end_date, not both',
+    });
+  }
+  if ((start_date === undefined) !== (end_date === undefined)) {
+    context.addIssue({
+      code: 'custom',
+      message: 'start_date and end_date must be provided together',
+    });
+  }
+  if (start_date !== undefined && end_date !== undefined && start_date > end_date) {
+    context.addIssue({
+      code: 'custom',
+      path: ['end_date'],
+      message: 'start_date must not be later than end_date',
+    });
+  }
+};
+
 export const dateOrRangeInputSchema = z
+  .object(dateOrRangeShape)
+  .strict()
+  .superRefine(refineDateOrRange);
+
+export const diaryInputSchema = z
   .object({
-    date: isoDateSchema.optional(),
-    start_date: isoDateSchema.optional(),
-    end_date: isoDateSchema.optional(),
+    ...dateOrRangeShape,
+    compact: z.boolean().default(true),
   })
   .strict()
-  .superRefine(({ date, start_date, end_date }, context) => {
-    if (date !== undefined && (start_date !== undefined || end_date !== undefined)) {
-      context.addIssue({
-        code: 'custom',
-        message: 'Provide either date or start_date/end_date, not both',
-      });
-    }
-    if ((start_date === undefined) !== (end_date === undefined)) {
-      context.addIssue({
-        code: 'custom',
-        message: 'start_date and end_date must be provided together',
-      });
-    }
-    if (start_date !== undefined && end_date !== undefined && start_date > end_date) {
-      context.addIssue({
-        code: 'custom',
-        path: ['end_date'],
-        message: 'start_date must not be later than end_date',
-      });
-    }
-  });
+  .superRefine(refineDateOrRange);
 
 export const searchProductsInputSchema = z
   .object({
@@ -66,7 +85,8 @@ export const searchProductsInputSchema = z
     countries: z.array(z.string().regex(/^[A-Z]{2}$/)).min(1).max(10).optional(),
     locales: z.array(z.string().regex(/^[a-z]{2}_[A-Z]{2}$/)).min(1).max(10).optional(),
     sex: z.enum(['male', 'female']).optional(),
-    limit: z.number().int().min(1).max(50).default(20),
+    limit: z.number().int().min(1).max(50).default(5),
+    compact: z.boolean().default(true),
   })
   .strict();
 
@@ -231,6 +251,19 @@ export const productOutputSchema = z.object({
   nutrition: nutritionSchema,
 });
 
+export const compactProductOutputSchema = z.object({
+  product_id: z.string(),
+  name: z.string(),
+  brand: z.string().nullable(),
+  serving: z.string().nullable(),
+  per_100g: z.object({
+    calories: z.number(),
+    protein: z.number(),
+    carbs: z.number(),
+    fat: z.number(),
+  }),
+});
+
 export const productDetailsOutputSchema = productOutputSchema.extend({
   servings: z.array(z.object({ serving: z.string(), amount: z.number() })),
   eans: z.array(z.string()),
@@ -283,7 +316,7 @@ export const userRecipeListOutputSchema = z
 
 export const diaryItemOutputSchema = z.object({
   id: z.string(),
-  date: isoDateSchema,
+  date: isoDateSchema.optional(),
   daytime: mealTypeSchema,
   kind: z.enum(['product', 'recipe_portion', 'simple_product']),
   product_id: z.string().nullable(),
@@ -292,7 +325,7 @@ export const diaryItemOutputSchema = z.object({
   amount: z.number(),
   serving: z.string().nullable(),
   serving_quantity: z.number().nullable(),
-  nutrition: nutritionSchema.nullable(),
+  nutrition: nutritionSchema.nullable().optional(),
 });
 
 export const diaryDayOutputSchema = z.object({
@@ -688,4 +721,43 @@ export const savedMealFileEntrySchema = z.object({
 
 export const savedMealsFileSchema = z.object({
   meals: z.array(savedMealFileEntrySchema).default([]),
+});
+
+// --- YAZIO-native user meals (/user/meals) ---------------------------------
+
+export const listUserMealsInputSchema = z
+  .object({
+    query: z.string().trim().min(1).max(200).optional(),
+  })
+  .strict();
+
+export const userMealSummarySchema = z.object({
+  meal_id: uuidSchema,
+  name: z.string(),
+  item_count: z.number().int().nonnegative(),
+});
+
+export const listUserMealsOutputSchema = z.object({
+  meals: z.array(userMealSummarySchema),
+});
+
+export const logUserMealInputSchema = z
+  .object({
+    client_request_id: z.string().trim().min(1).max(200),
+    name: z.string().trim().min(1).max(200),
+    date: isoDateSchema,
+    daytime: mealTypeSchema.optional(),
+    amount_factor: z.number().finite().positive().max(10).default(1),
+    dry_run: z.boolean().default(true),
+  })
+  .strict();
+
+export const logUserMealOutputSchema = z.object({
+  meal_name: z.string(),
+  meal_id: uuidSchema,
+  matched_by: z.literal('name'),
+  date: isoDateSchema,
+  daytime: mealTypeSchema,
+  amount_factor: z.number().finite().positive(),
+  batch: batchOutputSchema,
 });

@@ -147,6 +147,20 @@ export interface WaterWriteInput {
   cumulativeMl: number;
 }
 
+export interface UserMealItem {
+  product_id: string;
+  amount: number;
+  serving: string | null;
+  serving_quantity: number | null;
+}
+
+export interface UserMeal {
+  id: string;
+  name: string;
+  items: UserMealItem[];
+  recipe_portion_count: number;
+}
+
 export interface NutritionBackend {
   getUserProfile(): Promise<UserProfile>;
   getGoals(date: string): Promise<Goals>;
@@ -160,6 +174,7 @@ export interface NutritionBackend {
   getProduct(id: string): Promise<ProductDetails | null>;
   listUserRecipeIds(): Promise<string[]>;
   getRecipe(id: string): Promise<UserRecipeDetails | null>;
+  listUserMeals(): Promise<UserMeal[]>;
   getDiary(date: string): Promise<DiaryDay>;
   getDailySummary(date: string): Promise<DailySummary>;
   getWaterIntake(date: string): Promise<WaterIntake>;

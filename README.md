@@ -77,9 +77,9 @@ same state file.
 |---|---|
 | `get_user_profile` | Privacy-filtered profile without email, birth date, tokens, or payment identifiers |
 | `get_goals` | Calorie, macro, water, step, and weight goals |
-| `search_products` | Text search with configurable country and locale |
+| `search_products` | Text search with configurable country and locale; `limit` defaults to **5** and `compact` to **true** (product_id, name, brand, serving, per_100g) |
 | `get_product` | Product details and normalized nutrients per 100 g/ml |
-| `get_diary` | Diary for one date or a range of up to 31 days |
+| `get_diary` | Diary for one date or a range of up to 31 days; `compact` defaults to **true** and omits per-item nutrition (daily totals stay intact) |
 | `get_daily_summary` | Daily nutrition, goals, water, steps, and four meal buckets |
 | `get_water_intake` | Cumulative water intake for a date |
 | `get_weight` | Latest known weight on or before a date |
@@ -94,6 +94,16 @@ same state file.
 | `update_consumed_item` | Safely replace the amount of an existing product entry |
 | `remove_consumed_item` | Remove an exact diary item after MRTR or one-time-token confirmation |
 | `add_water_intake` | Add water by updating the cumulative daily total |
+
+### YAZIO meal tools
+
+Meal templates created in the YAZIO app itself (`GET /user/meals`), booked with
+the same guarantees as `add_meal_batch`.
+
+| Tool | Description |
+|---|---|
+| `list_user_meals` | List the meals saved in YAZIO as `meal_id`, `name`, `item_count`; optional case-insensitive `query` filter |
+| `log_user_meal` | Book a YAZIO meal by name (case-insensitive); `daytime` is required, `amount_factor` scales every item, `dry_run` defaults to `true` |
 
 ### Saved meal tools
 

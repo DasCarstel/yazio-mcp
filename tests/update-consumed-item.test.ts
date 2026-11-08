@@ -69,7 +69,8 @@ const createStatefulBackend = (options?: {
     getUserProfile: vi.fn(),
     getGoals: vi.fn(),
     searchProducts: vi.fn(),
-    getProduct: vi.fn().mockImplementation(() => {
+    listUserMeals: vi.fn(),
+  getProduct: vi.fn().mockImplementation(() => {
       events.push('get_product');
       return Promise.resolve(product);
     }),
