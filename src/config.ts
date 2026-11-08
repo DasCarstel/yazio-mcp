@@ -18,6 +18,7 @@ const environmentSchema = z
     YAZIO_BASE_URL: z.url().default('https://yzapi.yazio.com/v19'),
     YAZIO_TOKEN_CACHE_PATH: z.string().min(1).optional(),
     YAZIO_MCP_STATE_PATH: z.string().min(1).optional(),
+    YAZIO_SAVED_MEALS_PATH: z.string().min(1).optional(),
     NUTRITION_MCP_STATE_PATH: z.string().min(1).optional(),
     YAZIO_MCP_TIMEZONE: z
       .string()
@@ -76,6 +77,7 @@ export interface AppConfig {
   clientSecret: string;
   tokenCachePath: string;
   statePath: string;
+  savedMealsPath: string;
   timezone: string;
   countries: string[];
   locales: string[];
@@ -116,6 +118,7 @@ export const loadConfig = (environment: NodeJS.ProcessEnv = process.env): AppCon
       parsed.data.YAZIO_MCP_STATE_PATH ??
       parsed.data.NUTRITION_MCP_STATE_PATH ??
       defaultPath('state.json'),
+    savedMealsPath: parsed.data.YAZIO_SAVED_MEALS_PATH ?? defaultPath('saved-meals.json'),
     timezone:
       parsed.data.YAZIO_MCP_TIMEZONE ??
       parsed.data.NUTRITION_MCP_TIMEZONE ??

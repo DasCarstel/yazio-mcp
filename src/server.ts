@@ -33,12 +33,18 @@ import {
   getGoalsInputSchema,
   getProductInputSchema,
   goalsOutputSchema,
+  listSavedMealsInputSchema,
+  listSavedMealsOutputSchema,
+  logSavedMealInputSchema,
+  logSavedMealOutputSchema,
   missingMealsInputSchema,
   missingMealsOutputSchema,
   productDetailsOutputSchema,
   productOutputSchema,
   removeConsumedItemInputSchema,
   removeConsumedItemOutputSchema,
+  saveMealInputSchema,
+  saveMealOutputSchema,
   searchProductsInputSchema,
   toolOutputSchema,
   trendsInputSchema,
@@ -49,6 +55,7 @@ import {
   waterOutputSchema,
   weightOutputSchema,
 } from './schemas.js';
+import { SavedMealService, SavedMealStore } from './services/saved-meals.js';
 import { WriteService } from './services/write-service.js';
 import type { NutritionBackend } from './types.js';
 import { mapSettledWithConcurrency, mapWithConcurrency } from './utils/concurrency.js';
@@ -175,6 +182,8 @@ export const createYazioServer = async (
   const writeService =
     dependencies.writeService ??
     new WriteService(backend, idempotency, config.timezone);
+  const savedMealStore = new SavedMealStore(config.savedMealsPath);
+  const savedMealService = new SavedMealService(savedMealStore, backend, writeService);
   const requestStateCodec = createRequestStateCodec<DestructiveRequestState>({
     key: await idempotency.requestStateKey(),
     ttlSeconds: 10 * 60,
@@ -423,6 +432,63 @@ export const createYazioServer = async (
         config,
         () => writeService.addMealBatch(input),
         (data) => `Batch result: ${statusText(data)}.`,
+      ),
+  );
+
+  server.registerTool(
+    'list_saved_meals',
+    {
+      title: 'Saved meals',
+      description:
+        'Lists locally saved meal templates with name, aliases, default daytime, item count, and estimated nutrition totals from product metadata.',
+      inputSchema: listSavedMealsInputSchema,
+      outputSchema: toolOutputSchema(listSavedMealsOutputSchema),
+      annotations: readAnnotations,
+    },
+    async () =>
+      safeResult(
+        config,
+        () => savedMealService.listMeals(),
+        (data) =>
+          `Retrieved ${
+            (data as { meals: unknown[] }).meals.length
+          } saved meals.`,
+      ),
+  );
+
+  server.registerTool(
+    'log_saved_meal',
+    {
+      title: 'Log saved meal',
+      description:
+        'Resolves a saved meal template by name or alias (case-insensitive) and books it through the same code path as add_meal_batch; dry_run defaults to true.',
+      inputSchema: logSavedMealInputSchema,
+      outputSchema: toolOutputSchema(logSavedMealOutputSchema),
+      annotations: writeAnnotations,
+    },
+    async (input) =>
+      safeResult(
+        config,
+        () => savedMealService.logSavedMeal(input),
+        (data) => `Batch result: ${statusText((data as { batch: unknown }).batch)}.`,
+      ),
+  );
+
+  server.registerTool(
+    'save_meal',
+    {
+      title: 'Save meal template',
+      description:
+        'Validates every product id against the YAZIO catalog and persists a named meal template atomically to the local saved-meals file; an identically named entry (case-insensitive) is replaced.',
+      inputSchema: saveMealInputSchema,
+      outputSchema: toolOutputSchema(saveMealOutputSchema),
+      annotations: writeAnnotations,
+    },
+    async (input) =>
+      safeResult(
+        config,
+        () => savedMealService.saveMeal(input),
+        (data) => `Saved meal "${(data as { meal: { name: string } }).meal.name}" locally.`,
       ),
   );
 

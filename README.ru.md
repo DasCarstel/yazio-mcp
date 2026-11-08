@@ -97,6 +97,17 @@ Codex, Hermes Agent и других MCP-клиентов.
 | `remove_consumed_item` | Удаление точной записи после MRTR или одноразового token |
 | `add_water_intake` | Добавление воды через изменение cumulative total |
 
+### Сохранённые приёмы пищи
+
+Локальные шаблоны блюд, чтобы агент мог записать целое блюдо (например
+«я поел мой Chicken Teriyaki») одним вызовом без хранения UUID продуктов.
+
+| Tool | Назначение |
+|---|---|
+| `save_meal` | Проверка каждого product id через YAZIO и атомарное сохранение шаблона блюда; существующая запись с тем же именем (без учёта регистра) заменяется |
+| `list_saved_meals` | Список шаблонов с алиасами, default daytime, числом позиций и оценкой итоговой нутрициологии |
+| `log_saved_meal` | Поиск шаблона по имени или алиасу (без учёта регистра) и запись через тот же код-путь, что и `add_meal_batch`; `dry_run` по умолчанию `true` |
+
 ### Аналитика
 
 | Tool | Назначение |
@@ -162,6 +173,7 @@ MIT-лицензированном
 | `YAZIO_BASE_URL` | `https://yzapi.yazio.com/v19` | Доверенная локальная настройка API |
 | `YAZIO_TOKEN_CACHE_PATH` | `~/.yazio-mcp/token.json` | Cache access/refresh token |
 | `YAZIO_MCP_STATE_PATH` | `~/.yazio-mcp/state.json` | Idempotency и confirmation state |
+| `YAZIO_SAVED_MEALS_PATH` | `~/.yazio-mcp/saved-meals.json` | Локальные шаблоны блюд для `save_meal`, `list_saved_meals` и `log_saved_meal` |
 | `YAZIO_MCP_TIMEZONE` | `UTC` | IANA timezone для дат |
 | `YAZIO_PRODUCT_COUNTRIES` | `US` | Страны поиска через запятую |
 | `YAZIO_PRODUCT_LOCALES` | `en_US` | Локали поиска через запятую |

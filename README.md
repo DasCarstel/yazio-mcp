@@ -95,6 +95,36 @@ same state file.
 | `remove_consumed_item` | Remove an exact diary item after MRTR or one-time-token confirmation |
 | `add_water_intake` | Add water by updating the cumulative daily total |
 
+### Saved meal tools
+
+Locally persisted meal templates so an agent can log a whole meal (for example
+"I ate my Chicken Teriyaki") in one call without memorizing product UUIDs.
+
+| Tool | Description |
+|---|---|
+| `save_meal` | Validate every product id against the YAZIO catalog and persist a named meal template atomically; an identically named entry (case-insensitive) is replaced |
+| `list_saved_meals` | List saved meal templates with aliases, default daytime, item count, and estimated nutrition totals |
+| `log_saved_meal` | Resolve a template by name or alias (case-insensitive) and book it through the same code path as `add_meal_batch`, with the same duplicate, verification, and compensation guarantees; `dry_run` defaults to `true` |
+
+Templates are stored in `saved-meals.json` (override with `YAZIO_SAVED_MEALS_PATH`):
+
+```json
+{
+  "meals": [
+    {
+      "name": "Chicken Teriyaki",
+      "aliases": ["teriyaki"],
+      "default_daytime": "lunch",
+      "items": [{ "product_id": "<uuid>", "amount": 250, "serving": "gram", "serving_quantity": null }]
+    }
+  ]
+}
+```
+
+The file is optional: a missing file simply means no templates are saved. Use
+`YAZIO_SAVED_MEALS_PATH` to place it outside the default `~/.yazio-mcp/`
+directory, for example `YAZIO_SAVED_MEALS_PATH=/var/lib/yazio-mcp/saved-meals.json`.
+
 ### Analytics tools
 
 | Tool | Description |
@@ -160,6 +190,7 @@ Both can be overridden together if YAZIO rotates them.
 | `YAZIO_BASE_URL` | `https://yzapi.yazio.com/v19` | Trusted local API configuration |
 | `YAZIO_TOKEN_CACHE_PATH` | `~/.yazio-mcp/token.json` | Access/refresh token cache |
 | `YAZIO_MCP_STATE_PATH` | `~/.yazio-mcp/state.json` | Idempotency and confirmation state |
+| `YAZIO_SAVED_MEALS_PATH` | `~/.yazio-mcp/saved-meals.json` | Locally saved meal templates used by `save_meal`, `list_saved_meals`, and `log_saved_meal` |
 | `YAZIO_MCP_TIMEZONE` | `UTC` | IANA timezone used for dates |
 | `YAZIO_PRODUCT_COUNTRIES` | `US` | Comma-separated product countries |
 | `YAZIO_PRODUCT_LOCALES` | `en_US` | Comma-separated product locales |

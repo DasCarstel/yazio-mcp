@@ -579,3 +579,113 @@ export const missingMealsOutputSchema = z
     partial: z.boolean(),
   })
   .strict();
+
+export const savedMealItemSchema = z
+  .object({
+    product_id: uuidSchema,
+    amount: z.number().finite().positive().max(100_000),
+    serving: z.string().trim().min(1).max(100).nullable().optional(),
+    serving_quantity: z.number().finite().positive().max(10_000).nullable().optional(),
+  })
+  .strict()
+  .superRefine(({ serving, serving_quantity }, context) => {
+    if ((serving == null) !== (serving_quantity == null)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'serving and serving_quantity must either both be provided or both be omitted',
+      });
+    }
+  });
+
+export const saveMealInputSchema = z
+  .object({
+    name: z.string().trim().min(1).max(200),
+    aliases: z.array(z.string().trim().min(1).max(100)).max(50).optional(),
+    default_daytime: mealTypeSchema.optional(),
+    items: z.array(savedMealItemSchema).min(1).max(50),
+  })
+  .strict();
+
+export const listSavedMealsInputSchema = z.object({}).strict();
+
+export const logSavedMealInputSchema = z
+  .object({
+    client_request_id: z.string().trim().min(8).max(128),
+    name: z.string().trim().min(1).max(200),
+    date: isoDateSchema,
+    daytime: mealTypeSchema.optional(),
+    amount_factor: z.number().finite().positive().max(10).default(1),
+    dry_run: z.boolean().default(true),
+  })
+  .strict();
+
+export const savedMealSummaryOutputSchema = z
+  .object({
+    name: z.string(),
+    aliases: z.array(z.string()),
+    default_daytime: mealTypeSchema.nullable(),
+    item_count: z.number().int().nonnegative(),
+    nutrition: nutritionSchema.nullable(),
+  })
+  .strict();
+
+export const listSavedMealsOutputSchema = z
+  .object({
+    meals: z.array(savedMealSummaryOutputSchema),
+  })
+  .strict();
+
+export const savedMealDefinitionOutputSchema = z
+  .object({
+    name: z.string(),
+    aliases: z.array(z.string()),
+    default_daytime: mealTypeSchema.nullable(),
+    items: z.array(
+      z.object({
+        product_id: uuidSchema,
+        amount: z.number().finite().positive(),
+        serving: z.string().nullable(),
+        serving_quantity: z.number().nullable(),
+      }),
+    ),
+  })
+  .strict();
+
+export const saveMealOutputSchema = z
+  .object({
+    meal: savedMealDefinitionOutputSchema,
+    replaced: z.boolean(),
+  })
+  .strict();
+
+export const logSavedMealOutputSchema = z
+  .object({
+    meal_name: z.string(),
+    matched_by: z.enum(['name', 'alias']),
+    amount_factor: z.number().positive(),
+    date: isoDateSchema,
+    daytime: mealTypeSchema,
+    batch: batchOutputSchema,
+  })
+  .strict();
+
+export const savedMealFileEntrySchema = z.object({
+  // Deliberately non-strict: unknown fields in the file are ignored on load.
+  name: z.string().trim().min(1),
+  aliases: z.array(z.string()).optional(),
+  default_daytime: mealTypeSchema.nullable().optional(),
+  items: z
+    .array(
+      z.object({
+        product_id: uuidSchema,
+        amount: z.number().finite().positive(),
+        serving: z.string().trim().min(1).max(100).nullable().optional(),
+        serving_quantity: z.number().finite().positive().max(10_000).nullable().optional(),
+      }),
+    )
+    .min(1),
+});
+
+export const savedMealsFileSchema = z.object({
+  meals: z.array(savedMealFileEntrySchema).default([]),
+});
